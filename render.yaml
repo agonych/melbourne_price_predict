@@ -1,0 +1,16 @@
+# Render.com blueprint. Push this repo, then in the Render dashboard click
+# "New +" → "Blueprint" and point it at the repo. The GOOGLE_API_KEY env var
+# must be set manually in the dashboard (it's not synced from git).
+services:
+  - type: web
+    name: property-price-predictor
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.13.0"

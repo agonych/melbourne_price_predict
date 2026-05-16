@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Melbourne Property Price Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main>
+        <header>
+            <h1>Melbourne Property Price Predictor</h1>
+            <p class="subtitle">
+                Estimates sold price for properties in
+                <strong>Malvern</strong>, <strong>Pakenham</strong>, or
+                <strong>Ringwood</strong>. Trained on recent realestate.com.au
+                sales using a Gradient Boosting model.
+            </p>
+        </header>
+
+        <form id="predict-form">
+            <label>
+                Address
+                <input
+                    type="text"
+                    name="address"
+                    placeholder="e.g. 9 Nicholls Street, Malvern VIC 3144"
+                    autocomplete="off"
+                    required>
+            </label>
+
+            <div class="row row-2">
+                <label>
+                    Suburb
+                    <select name="suburb" required>
+                        {% for s in valid_suburbs %}
+                            <option value="{{ s }}">{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    Property type
+                    <select name="propertyType" required>
+                        {% for pt in valid_property_types %}
+                            <option value="{{ pt }}"{% if pt == 'house' %} selected{% endif %}>
+                                {{ pt|capitalize }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+
+            <label>
+                Year sold
+                <select name="soldYear" required>
+                    {% for y in valid_sold_years %}
+                        <option value="{{ y }}"{% if loop.first %} selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <div class="row">
+                <label>
+                    Bedrooms
+                    <input type="number" name="bedrooms" min="0" max="20" value="3" required>
+                </label>
+                <label>
+                    Bathrooms
+                    <input type="number" name="bathrooms" min="0" max="20" value="2" required>
+                </label>
+                <label>
+                    Parking
+                    <input type="number" name="parkingSpaces" min="0" max="20" value="2" required>
+                </label>
+            </div>
+
+            <label>
+                Land size (sqm) <span class="hint">— leave blank for apartments / units</span>
+                <input
+                    type="number"
+                    name="landSize"
+                    min="0"
+                    max="100000"
+                    step="0.1"
+                    placeholder="e.g. 600">
+            </label>
+
+            <button type="submit" id="submit-btn">Predict price</button>
+        </form>
+
+        <div id="result" aria-live="polite"></div>
+
+        <footer>
+            <p class="footnote">
+                Created by <strong>Andrej Kudriavcev</strong>, student ID <strong>224939307</strong>
+            </p>
+        </footer>
+    </main>
+
+    <script>
+        const form = document.getElementById("predict-form");
+        const result = document.getElementById("result");
+        const submitBtn = document.getElementById("submit-btn");
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Predicting…";
+            result.innerHTML = '<p class="loading">Geocoding the address and enriching the data…</p>';
+
+            try {
+                const res = await fetch("/predict", {
+                    method: "POST",
+                    body: new FormData(form),
+                });
+                const data = await res.json();
+
+                if (!data.ok) {
+                    result.innerHTML = `<div class="error">${escapeHtml(data.error || "Prediction failed")}</div>`;
+                    return;
+                }
+
+                const en = data.enrichment;
+                result.innerHTML = `
+                    <div class="success">
+                        <h2>${data.predicted_price_display}</h2>
+                        <p class="caption">Predicted sold price</p>
+                        <details>
+                            <summary>Google API data</summary>
+                            <ul>
+                                <li>Suburb (from address): <strong>${en.detectedSuburb}</strong></li>
+                                <li>Distance to CBD: <strong>${en.distanceToCbd} km</strong></li>
+                                <li>Distance to nearest train station: <strong>${en.distanceToStation} km</strong></li>
+                                <li>Primary schools within 2km: <strong>${en.primarySchools}</strong></li>
+                                <li>Secondary schools within 2km: <strong>${en.secondarySchools}</strong></li>
+                            </ul>
+                        </details>
+                    </div>
+                `;
+            } catch (err) {
+                result.innerHTML = `<div class="error">Request failed: ${escapeHtml(err.message)}</div>`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Predict price";
+            }
+        });
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[c]));
+        }
+    </script>
+</body>
+</html>
